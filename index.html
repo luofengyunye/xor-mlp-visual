@@ -1,0 +1,2306 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="单文件交互式 XOR 2-2-1 MLP 教学可视化：前向传播、反向传播、Adam、决策边界和隐藏层激活等高线。">
+  <title>XOR MLP · 参数与决策面实验室</title>
+  <style>
+    :root {
+      --bg: #091115;
+      --bg-deep: #070d10;
+      --card: #101a1f;
+      --card-soft: #142127;
+      --card-raised: #18272e;
+      --ink: #eef3eb;
+      --muted: #91a39f;
+      --faint: #647773;
+      --line: rgba(226, 244, 234, .12);
+      --line-strong: rgba(226, 244, 234, .22);
+      --lime: #d8f474;
+      --teal: #54d6c4;
+      --teal-soft: rgba(84, 214, 196, .14);
+      --orange: #ff9b70;
+      --orange-soft: rgba(255, 155, 112, .13);
+      --yellow: #ffd36b;
+      --blue: #77adff;
+      --white: #f7f8ef;
+      --shadow: 0 24px 70px rgba(0, 0, 0, .3);
+      --radius: 22px;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      --sans: "Segoe UI Variable", "Aptos", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 2%, rgba(84, 214, 196, .10), transparent 28rem),
+        radial-gradient(circle at 92% 9%, rgba(255, 155, 112, .09), transparent 26rem),
+        linear-gradient(180deg, #0a1216 0%, var(--bg) 46%, #080f12 100%);
+      font-family: var(--sans);
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible {
+      outline: 2px solid var(--lime);
+      outline-offset: 3px;
+    }
+
+    .page {
+      width: min(1460px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 28px 0 52px;
+    }
+
+    .masthead {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font: 11px/1.4 var(--mono);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .brand { color: var(--lime); font-weight: 700; }
+    .masthead-right { display: flex; align-items: center; gap: 9px; }
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 0 4px rgba(84, 214, 196, .12);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(330px, .55fr);
+      gap: 48px;
+      align-items: end;
+      padding: 54px 0 38px;
+    }
+
+    .eyebrow {
+      color: var(--teal);
+      font: 700 12px/1.4 var(--mono);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 920px;
+      margin: 16px 0 20px;
+      font-size: clamp(43px, 6.5vw, 88px);
+      font-weight: 620;
+      letter-spacing: -.058em;
+      line-height: .98;
+    }
+
+    h1 .accent {
+      color: var(--lime);
+      text-shadow: 0 0 38px rgba(216, 244, 116, .12);
+    }
+
+    .hero-copy {
+      max-width: 750px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .hero-copy strong { color: var(--ink); font-weight: 600; }
+    .hero-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+    .tag {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #b5c3be;
+      background: rgba(255, 255, 255, .018);
+      font: 11px/1 var(--mono);
+    }
+    .tag b { color: var(--lime); font-weight: 600; }
+
+    .formula-card {
+      position: relative;
+      overflow: hidden;
+      padding: 25px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: linear-gradient(145deg, rgba(24, 39, 46, .92), rgba(14, 23, 28, .95));
+      box-shadow: var(--shadow);
+    }
+    .formula-card::after {
+      content: "";
+      position: absolute;
+      right: -48px;
+      top: -52px;
+      width: 145px;
+      height: 145px;
+      border: 1px solid rgba(216, 244, 116, .15);
+      border-radius: 50%;
+      box-shadow: 0 0 0 26px rgba(216, 244, 116, .025), 0 0 0 52px rgba(216, 244, 116, .018);
+    }
+    .formula-card small {
+      display: block;
+      margin-bottom: 17px;
+      color: var(--faint);
+      font: 10px var(--mono);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .formula-card .formula {
+      position: relative;
+      z-index: 1;
+      color: var(--white);
+      font: 18px/1.7 var(--mono);
+    }
+    .formula-card .formula b { color: var(--lime); font-weight: 600; }
+    .formula-note {
+      margin: 16px 0 0;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(150deg, rgba(18, 29, 35, .96), rgba(14, 23, 28, .98));
+      box-shadow: 0 16px 50px rgba(0, 0, 0, .16);
+    }
+
+    .control-card {
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 16px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+    .control-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 3px;
+      background: linear-gradient(var(--lime), var(--teal));
+    }
+
+    .control-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+    }
+    .epoch-readout {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-top: 4px;
+      font: 600 36px/1 var(--mono);
+      letter-spacing: -.04em;
+    }
+    .epoch-readout span { color: var(--faint); font-size: 15px; letter-spacing: 0; }
+    .control-heading p { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+    .transport-buttons { display: flex; align-items: center; gap: 9px; }
+
+    .btn {
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      padding: 10px 15px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, .035);
+      transition: border-color .18s, background .18s, transform .18s;
+    }
+    .btn:hover { border-color: rgba(216, 244, 116, .42); background: rgba(255, 255, 255, .06); }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary {
+      min-width: 92px;
+      border-color: var(--lime);
+      color: #11180f;
+      background: var(--lime);
+      font-weight: 700;
+    }
+    .btn-primary:hover { background: #e3fa92; border-color: #e3fa92; }
+
+    .range-wrap { margin: 22px 0 6px; }
+    .epoch-range {
+      width: 100%;
+      height: 7px;
+      margin: 0;
+      border-radius: 99px;
+      appearance: none;
+      background: linear-gradient(90deg, var(--lime) var(--range-progress, 100%), rgba(255,255,255,.10) var(--range-progress, 100%));
+      cursor: pointer;
+    }
+    .epoch-range::-webkit-slider-thumb {
+      width: 20px;
+      height: 20px;
+      border: 4px solid var(--bg);
+      border-radius: 50%;
+      appearance: none;
+      background: var(--lime);
+      box-shadow: 0 0 0 1px var(--lime), 0 0 18px rgba(216, 244, 116, .25);
+    }
+    .epoch-range::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border: 4px solid var(--bg);
+      border-radius: 50%;
+      background: var(--lime);
+      box-shadow: 0 0 0 1px var(--lime);
+    }
+
+    .timeline-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--faint);
+      font: 10px var(--mono);
+    }
+    .preset {
+      border: 0;
+      border-radius: 7px;
+      padding: 3px 6px;
+      color: var(--muted);
+      background: transparent;
+      font: inherit;
+    }
+    .preset:hover { color: var(--lime); background: rgba(216, 244, 116, .07); }
+
+    .metrics-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .metric {
+      padding: 12px 14px;
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 13px;
+      background: rgba(255, 255, 255, .022);
+    }
+    .metric small {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--faint);
+      font: 10px var(--mono);
+      letter-spacing: .04em;
+    }
+    .metric b { font: 600 17px/1.3 var(--mono); color: var(--white); }
+    .metric b.teal { color: var(--teal); }
+    .metric b.orange { color: var(--orange); }
+    .metric b.lime { color: var(--lime); }
+
+    .learning-prompt {
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 16px;
+      padding: 20px 22px;
+      border-color: rgba(216, 244, 116, .25);
+      background:
+        linear-gradient(105deg, rgba(216, 244, 116, .075), rgba(84, 214, 196, .025) 44%, rgba(14, 23, 28, .96));
+      box-shadow: 0 16px 48px rgba(0, 0, 0, .18);
+    }
+    .prompt-symbol {
+      display: grid;
+      place-items: center;
+      width: 50px;
+      height: 50px;
+      border: 1px solid rgba(216, 244, 116, .34);
+      border-radius: 15px;
+      color: var(--lime);
+      background: rgba(216, 244, 116, .07);
+      font: 600 23px/1 var(--mono);
+    }
+    .prompt-body { min-width: 0; }
+    .prompt-kicker {
+      color: var(--teal);
+      font: 9px var(--mono);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .prompt-body h2 {
+      margin: 4px 0 7px;
+      color: var(--white);
+      font-size: 18px;
+      font-weight: 570;
+      letter-spacing: -.02em;
+    }
+    .prompt-lead {
+      max-width: 930px;
+      margin: 0;
+      color: #bcc9c4;
+      font-size: 12px;
+      line-height: 1.75;
+    }
+    .prompt-lead b { color: var(--lime); font-weight: 600; }
+    .prompt-conclusion {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-left: 2px solid rgba(84, 214, 196, .5);
+      border-radius: 0 8px 8px 0;
+      background: rgba(84, 214, 196, .035);
+    }
+    .prompt-conclusion strong {
+      flex: 0 0 auto;
+      margin-top: 2px;
+      color: var(--teal);
+      font: 8px/1.5 var(--mono);
+      letter-spacing: .04em;
+    }
+    .prompt-conclusion p {
+      max-width: 930px;
+      margin: 0;
+      color: #aebeb8;
+      font: 10px/1.75 var(--sans);
+    }
+    .prompt-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 11px;
+    }
+    .prompt-fact {
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.018);
+      color: var(--faint);
+      font: 9px/1.35 var(--mono);
+    }
+    .prompt-fact b { margin-left: 4px; color: var(--ink); font-weight: 500; }
+    .prompt-side {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 9px;
+    }
+    .prompt-phase {
+      padding: 5px 8px;
+      border: 1px solid rgba(84, 214, 196, .2);
+      border-radius: 999px;
+      color: var(--teal);
+      background: rgba(84, 214, 196, .05);
+      font: 9px var(--mono);
+      white-space: nowrap;
+    }
+    .prompt-next {
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      padding: 6px 9px;
+      color: var(--muted);
+      background: rgba(255,255,255,.025);
+      font: 9px var(--mono);
+      white-space: nowrap;
+    }
+    .prompt-next:hover { border-color: rgba(216,244,116,.4); color: var(--lime); }
+
+    .lab-grid {
+      display: grid;
+      grid-template-columns: minmax(380px, .82fr) minmax(540px, 1.18fr);
+      gap: 16px;
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 21px 22px 17px;
+      border-bottom: 1px solid var(--line);
+    }
+    .card-head h2 {
+      margin: 3px 0 0;
+      font-size: 19px;
+      font-weight: 580;
+      letter-spacing: -.025em;
+    }
+    .card-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+    .section-no {
+      color: var(--orange);
+      font: 10px var(--mono);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .network-card { min-width: 0; }
+    .network-content { padding: 18px 20px 19px; }
+    .sample-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 7px;
+    }
+    .sample-btn {
+      min-width: 0;
+      padding: 9px 8px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      color: var(--muted);
+      background: rgba(255,255,255,.018);
+      text-align: left;
+      transition: border-color .18s, color .18s, background .18s;
+    }
+    .sample-btn:hover { border-color: var(--line-strong); color: var(--ink); }
+    .sample-btn.active {
+      border-color: rgba(216, 244, 116, .72);
+      color: var(--ink);
+      background: rgba(216, 244, 116, .075);
+      box-shadow: inset 0 0 0 1px rgba(216, 244, 116, .08);
+    }
+    .sample-btn b {
+      display: block;
+      color: inherit;
+      font: 600 12px var(--mono);
+      white-space: nowrap;
+    }
+    .sample-btn span {
+      display: block;
+      margin-top: 3px;
+      overflow: hidden;
+      color: var(--faint);
+      font: 9px var(--mono);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .network-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      margin: 12px 0 4px;
+      overflow: visible;
+    }
+    .edge {
+      transition: stroke-width .25s, opacity .25s;
+      stroke-linecap: round;
+    }
+    .node-shell { stroke-width: 1.6; }
+    .node-label {
+      fill: var(--white);
+      font: 600 16px var(--mono);
+      text-anchor: middle;
+    }
+    .node-value {
+      fill: var(--ink);
+      font: 600 11px var(--mono);
+      text-anchor: middle;
+    }
+    .node-sub {
+      fill: var(--faint);
+      font: 9px var(--mono);
+      text-anchor: middle;
+    }
+    .layer-name {
+      fill: var(--faint);
+      font: 9px var(--mono);
+      letter-spacing: .12em;
+      text-anchor: middle;
+    }
+    .weight-tag-text {
+      fill: #d8e3de;
+      font: 9px var(--mono);
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+    .network-note {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      color: var(--faint);
+      font-size: 11px;
+    }
+    .inline-legend { display: flex; flex-wrap: wrap; gap: 12px; }
+    .inline-legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .swatch {
+      width: 14px;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--teal);
+    }
+    .swatch.negative { background: var(--orange); }
+
+    .boundary-card { min-width: 0; }
+    .layer-controls { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    .layer-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      color: var(--muted);
+      background: rgba(255,255,255,.02);
+      font: 9px var(--mono);
+      cursor: pointer;
+      user-select: none;
+    }
+    .layer-toggle input { width: 11px; height: 11px; margin: 0; accent-color: var(--teal); }
+    .plot-wrap {
+      position: relative;
+      margin: 0 16px;
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 15px;
+      overflow: hidden;
+      background: #0b1418;
+    }
+    #boundaryCanvas {
+      display: block;
+      width: 100%;
+      height: 500px;
+      cursor: crosshair;
+    }
+    .canvas-tooltip {
+      position: absolute;
+      z-index: 4;
+      display: none;
+      min-width: 154px;
+      padding: 9px 10px;
+      border: 1px solid rgba(216, 244, 116, .3);
+      border-radius: 9px;
+      color: var(--ink);
+      background: rgba(8, 15, 18, .94);
+      box-shadow: 0 10px 28px rgba(0,0,0,.35);
+      font: 10px/1.7 var(--mono);
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+    }
+    .canvas-tooltip b { color: var(--lime); }
+    .plot-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      padding: 13px 20px 18px;
+      color: var(--faint);
+      font-size: 11px;
+    }
+    .plot-footer p { margin: 0; max-width: 470px; }
+    .contour-legend { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+    .contour-key { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .contour-line { width: 18px; height: 2px; background: var(--blue); }
+    .contour-line.h2 { background: var(--yellow); }
+    .contour-line.decision { height: 3px; background: var(--white); }
+
+    .lower-grid {
+      display: grid;
+      grid-template-columns: minmax(390px, .87fr) minmax(480px, 1.13fr);
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .chart-wrap { padding: 14px 16px 10px; }
+    #lossCanvas { display: block; width: 100%; height: 245px; }
+    .chart-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 4px 21px 18px;
+      color: var(--faint);
+      font-size: 10px;
+    }
+    .axis-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font: 10px var(--mono);
+      cursor: pointer;
+    }
+    .axis-toggle input { accent-color: var(--lime); margin: 0; }
+
+    .forward-card { min-width: 0; }
+    .selected-pill {
+      padding: 5px 9px;
+      border: 1px solid rgba(216,244,116,.25);
+      border-radius: 999px;
+      color: var(--lime);
+      background: rgba(216,244,116,.06);
+      font: 10px var(--mono);
+      white-space: nowrap;
+    }
+    .step-list { padding: 8px 22px 0; }
+    .calc-step {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      gap: 11px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .calc-step:last-of-type { border-bottom: 0; }
+    .step-index {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      color: var(--faint);
+      font: 9px var(--mono);
+    }
+    .step-copy { min-width: 0; }
+    .step-copy strong {
+      display: block;
+      color: #d7e0dc;
+      font-size: 12px;
+      font-weight: 550;
+    }
+    .step-copy code {
+      display: block;
+      margin-top: 3px;
+      overflow-wrap: anywhere;
+      color: var(--muted);
+      font: 10px/1.65 var(--mono);
+    }
+    .step-value {
+      justify-self: end;
+      max-width: 172px;
+      padding: 5px 7px;
+      border-radius: 7px;
+      color: var(--teal);
+      background: rgba(84,214,196,.055);
+      font: 10px/1.45 var(--mono);
+      text-align: right;
+    }
+    .step-value.orange { color: var(--orange); background: rgba(255,155,112,.06); }
+    .prediction-bar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+      margin: 8px 22px 20px;
+      padding: 14px 15px;
+      border: 1px solid rgba(216,244,116,.18);
+      border-radius: 13px;
+      background: linear-gradient(100deg, rgba(216,244,116,.07), rgba(84,214,196,.025));
+    }
+    .prediction-bar small {
+      display: block;
+      color: var(--faint);
+      font: 9px var(--mono);
+      letter-spacing: .03em;
+    }
+    .prediction-bar strong {
+      display: block;
+      margin-top: 2px;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 550;
+    }
+    .probability {
+      color: var(--lime);
+      font: 600 22px/1 var(--mono);
+      letter-spacing: -.03em;
+    }
+
+    .weights-card { margin-top: 16px; }
+    .weights-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(250px, .8fr);
+      gap: 22px;
+      padding: 21px 22px 22px;
+    }
+    .weights-matrices {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 12px;
+      min-width: 0;
+    }
+    .matrix-group {
+      min-width: 0;
+      padding: 15px;
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 15px;
+      background: rgba(255,255,255,.018);
+    }
+    .matrix-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 11px;
+    }
+    .matrix-title b { color: var(--white); font: 600 13px var(--mono); }
+    .matrix-title span { color: var(--faint); font: 9px var(--mono); }
+    .matrix-layout {
+      display: grid;
+      grid-template-columns: 25px minmax(0, 1fr);
+      gap: 7px;
+      align-items: center;
+    }
+    .axis-labels {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: 7px;
+      height: 100%;
+      color: var(--faint);
+      font: 9px var(--mono);
+      text-align: center;
+    }
+    .axis-labels span { display: grid; place-items: center; }
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+    }
+    .weight-cell {
+      min-width: 0;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(84,214,196,.04);
+    }
+    .weight-cell.negative { background: rgba(255,155,112,.04); }
+    .weight-cell span {
+      display: block;
+      color: var(--faint);
+      font: 8px var(--mono);
+    }
+    .weight-cell strong {
+      display: block;
+      margin-top: 2px;
+      overflow: hidden;
+      color: var(--teal);
+      font: 600 13px var(--mono);
+      text-overflow: ellipsis;
+    }
+    .weight-cell.negative strong { color: var(--orange); }
+    .weight-cell small {
+      display: block;
+      margin-top: 3px;
+      color: var(--faint);
+      font: 8px var(--mono);
+      white-space: nowrap;
+    }
+    .matrix-foot {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 11px;
+      color: var(--faint);
+      font: 8px var(--mono);
+    }
+    .bias-block {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      margin-top: 8px;
+    }
+    .bias-block.one { grid-template-columns: 1fr; }
+    .optimizer-note {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .gradient-chain {
+      padding: 13px 14px;
+      border-left: 2px solid var(--teal);
+      border-radius: 0 10px 10px 0;
+      background: rgba(84,214,196,.045);
+      color: var(--muted);
+      font: 10px/1.8 var(--mono);
+    }
+    .gradient-chain b { color: var(--teal); font-weight: 500; }
+    .optimizer-note p { margin: 0; color: var(--muted); font-size: 11px; }
+
+    .reading-guide {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .guide-item {
+      min-height: 112px;
+      padding: 17px 18px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: rgba(255,255,255,.014);
+    }
+    .guide-item .guide-no { color: var(--teal); font: 9px var(--mono); }
+    .guide-item h3 { margin: 8px 0 5px; font-size: 13px; font-weight: 570; }
+    .guide-item p { margin: 0; color: var(--faint); font-size: 10px; }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      margin-top: 32px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--faint);
+      font: 10px/1.7 var(--mono);
+    }
+    footer p { margin: 0; max-width: 880px; }
+    .footer-mark { color: var(--lime); white-space: nowrap; }
+
+    @media (max-width: 1120px) {
+      .hero { grid-template-columns: 1.2fr .8fr; gap: 28px; }
+      .lab-grid, .lower-grid { grid-template-columns: 1fr; }
+      #boundaryCanvas { height: 520px; }
+      .weights-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 800px) {
+      .page { width: min(100% - 24px, 1460px); padding-top: 18px; }
+      .masthead-right span:last-child { display: none; }
+      .hero { grid-template-columns: 1fr; padding: 36px 0 28px; }
+      h1 { font-size: clamp(42px, 13vw, 72px); }
+      .formula-card { max-width: 520px; }
+      .control-top { display: block; }
+      .transport-buttons { margin-top: 18px; }
+      .metrics-strip { grid-template-columns: repeat(2, 1fr); }
+      .learning-prompt { grid-template-columns: 42px minmax(0, 1fr); gap: 13px; padding: 17px; }
+      .prompt-symbol { width: 40px; height: 40px; border-radius: 12px; font-size: 19px; }
+      .prompt-side { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; }
+      .lab-grid { grid-template-columns: minmax(0, 1fr); }
+      .weights-grid { grid-template-columns: 1fr; }
+      .reading-guide { grid-template-columns: 1fr; }
+      .plot-footer { display: block; }
+      .contour-legend { justify-content: flex-start; margin-top: 9px; }
+    }
+
+    @media (max-width: 530px) {
+      .page { width: calc(100% - 18px); }
+      .masthead { font-size: 9px; }
+      .sample-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .card-head { flex-direction: column; }
+      .layer-controls { justify-content: flex-start; }
+      #boundaryCanvas { height: 420px; }
+      .network-content { padding-inline: 12px; }
+      .plot-wrap { margin-inline: 9px; }
+      .weights-matrices { grid-template-columns: 1fr; }
+      .calc-step { grid-template-columns: 26px minmax(0, 1fr); }
+      .step-value { grid-column: 2; justify-self: start; max-width: 100%; text-align: left; }
+      .prediction-bar { grid-template-columns: 1fr; }
+      .timeline-meta span:first-child { display: none; }
+      footer { display: block; }
+      .footer-mark { display: block; margin-top: 8px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="masthead">
+      <span class="brand">XOR / MLP LAB · 2 → 2 → 1</span>
+      <span class="masthead-right"><i class="live-dot" aria-hidden="true"></i><span>浏览器本地训练与推演</span><span>NO BACKEND</span></span>
+    </header>
+
+    <section class="hero" aria-labelledby="pageTitle">
+      <div>
+        <div class="eyebrow">机器学习课程作业 · MLP 参数学习与可视化</div>
+        <h1 id="pageTitle">让 XOR 的决策面，<br><span class="accent">随训练慢慢弯曲。</span></h1>
+        <p class="hero-copy">
+          一个用来观察 <strong>MLP 学习参数</strong> 的实验：只有 <strong>2 个输入、2 个隐藏神经元、1 个输出</strong>。拖动训练轮次，同时观察参数、两个隐藏激活场和输出概率如何一起改变。
+        </p>
+        <div class="hero-tags" aria-label="实验配置">
+          <span class="tag"><b>课程作业</b></span>
+          <span class="tag"><b>600</b> epochs</span>
+          <span class="tag">sigmoid hidden</span>
+          <span class="tag">BCEWithLogits</span>
+          <span class="tag">Adam · full batch</span>
+        </div>
+      </div>
+      <aside class="formula-card" aria-label="模型公式">
+        <small>Current forward pass</small>
+        <div class="formula">
+          h = σ(<b>W₁ᵀx + b₁</b>)<br>
+          z = <b>w₂ᵀh + b₂</b><br>
+          p(y=1|x) = σ(<b>z</b>)
+        </div>
+        <p class="formula-note">输出层保留 logit z，损失直接在 logit 上计算，数值更稳定。</p>
+      </aside>
+    </section>
+
+    <main>
+      <section class="card control-card" aria-labelledby="timelineTitle">
+        <div class="control-top">
+          <div class="control-heading">
+            <div class="section-no">01 · TRAINING TIMELINE</div>
+            <div class="epoch-readout"><strong id="epochValue">600</strong><span>/ <b id="epochTotal">600</b> epoch</span></div>
+            <p id="timelineTitle">每一条曲线和每个像素都由当前参数实时计算</p>
+          </div>
+          <div class="transport-buttons">
+            <button class="btn btn-primary" id="playBtn" type="button" aria-label="从当前轮次继续播放">播放</button>
+            <button class="btn" id="resetBtn" type="button">重置</button>
+          </div>
+        </div>
+        <div class="range-wrap">
+          <input class="epoch-range" id="epochRange" type="range" min="0" max="600" step="1" value="600" aria-label="训练轮次">
+        </div>
+        <div class="timeline-meta" aria-hidden="true">
+          <span>INITIAL</span>
+          <button class="preset" type="button" data-epoch="0">0</button>
+          <button class="preset" type="button" data-epoch="50">50</button>
+          <button class="preset" type="button" data-epoch="200">200</button>
+          <button class="preset" type="button" data-epoch="600">600</button>
+          <span style="margin-left:auto">点击预设或拖动滑块</span>
+        </div>
+        <div class="metrics-strip">
+          <div class="metric"><small>BCE LOSS</small><b class="orange" id="lossValue">—</b></div>
+          <div class="metric"><small>ACCURACY</small><b class="teal" id="accuracyValue">—</b></div>
+          <div class="metric"><small>MAX |WEIGHT|</small><b class="lime" id="maxWeightValue">—</b></div>
+          <div class="metric"><small>GRADIENT NORM</small><b id="gradNormValue">—</b></div>
+        </div>
+      </section>
+
+      <section class="card learning-prompt" aria-labelledby="learningPromptTitle">
+        <div class="prompt-symbol" aria-hidden="true">Σ</div>
+        <div class="prompt-body">
+          <div class="prompt-kicker">Experiment conclusion · synchronized with the selected epoch</div>
+          <h2 id="learningPromptTitle">MLP 学习参数实验结论</h2>
+          <p class="prompt-lead" id="learningPrompt">正在根据当前轮次生成实验结论……</p>
+          <div class="prompt-conclusion">
+            <strong>结论</strong>
+            <p id="promptConclusion"></p>
+          </div>
+          <div class="prompt-facts" id="promptFacts"></div>
+        </div>
+        <div class="prompt-side">
+          <span class="prompt-phase" id="promptPhase">初始状态</span>
+          <button class="prompt-next" id="promptNextBtn" type="button">跳到下一阶段 →</button>
+        </div>
+      </section>
+
+      <section class="lab-grid">
+        <article class="card network-card" aria-labelledby="networkTitle">
+          <div class="card-head">
+            <div>
+              <div class="section-no">02 · NETWORK STATE</div>
+              <h2 id="networkTitle">当前样本的网络状态</h2>
+              <p>线宽表示权重幅值，颜色表示正负；节点填色表示激活值。</p>
+            </div>
+            <span class="tag" id="networkEpochTag">epoch 600</span>
+          </div>
+          <div class="network-content">
+            <div class="sample-tabs" id="sampleTabs" aria-label="选择 XOR 样本"></div>
+            <svg class="network-svg" id="networkSvg" viewBox="0 0 620 430" role="img" aria-label="二输入、二隐藏神经元、一输出的 XOR 神经网络"></svg>
+            <div class="network-note">
+              <div class="inline-legend"><span><i class="swatch"></i>正权重</span><span><i class="swatch negative"></i>负权重</span></div>
+              <span>边上的数字为 W₁ / w₂</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card boundary-card" aria-labelledby="boundaryTitle">
+          <div class="card-head">
+            <div>
+              <div class="section-no">03 · DECISION SURFACE</div>
+              <h2 id="boundaryTitle">概率热力图 × 隐藏激活等高线</h2>
+              <p>背景是 p(y=1|x)；白线是 0.5 决策边界。</p>
+            </div>
+            <div class="layer-controls" aria-label="图层开关">
+              <label class="layer-toggle"><input id="showHeat" type="checkbox" checked>概率热力</label>
+              <label class="layer-toggle"><input id="showH1" type="checkbox" checked>h₁ 等高线</label>
+              <label class="layer-toggle"><input id="showH2" type="checkbox" checked>h₂ 等高线</label>
+            </div>
+          </div>
+          <div class="plot-wrap">
+            <canvas id="boundaryCanvas" aria-label="XOR 输出概率热力图与两个隐藏神经元激活等高线"></canvas>
+            <div class="canvas-tooltip" id="canvasTooltip" role="status"></div>
+          </div>
+          <div class="plot-footer">
+            <p>把鼠标移到平面上可读取任意点的 x₁、x₂、两个隐藏激活和输出概率。等高线取 h=0.2、0.5、0.8。</p>
+            <div class="contour-legend" aria-label="等高线图例">
+              <span class="contour-key"><i class="contour-line"></i>h₁</span>
+              <span class="contour-key"><i class="contour-line h2"></i>h₂</span>
+              <span class="contour-key"><i class="contour-line decision"></i>p=0.5</span>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="lower-grid">
+        <article class="card" aria-labelledby="lossTitle">
+          <div class="card-head">
+            <div>
+              <div class="section-no">04 · TRAINING SIGNAL</div>
+              <h2 id="lossTitle">全批量 BCE 损失</h2>
+              <p>当前轮次使用实心圆标出。</p>
+            </div>
+            <span class="tag" id="lossTag">log scale</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="lossCanvas" aria-label="训练损失随 epoch 变化的曲线"></canvas>
+          </div>
+          <div class="chart-footer">
+            <span>每个 epoch 只有一个 batch，因此曲线是平滑的参数轨迹。</span>
+            <label class="axis-toggle"><input id="logScale" type="checkbox" checked>对数纵轴</label>
+          </div>
+        </article>
+
+        <article class="card forward-card" aria-labelledby="forwardTitle">
+          <div class="card-head">
+            <div>
+              <div class="section-no">05 · ONE FORWARD PASS</div>
+              <h2 id="forwardTitle">选中样本的逐层计算</h2>
+              <p>所有数值随 epoch 改变，公式保持固定。</p>
+            </div>
+            <span class="selected-pill" id="selectedPill">x = [0, 1]ᵀ</span>
+          </div>
+          <div class="step-list" id="forwardSteps"></div>
+          <div class="prediction-bar" id="predictionBar"></div>
+        </article>
+      </section>
+
+      <article class="card weights-card" aria-labelledby="weightsTitle">
+        <div class="card-head">
+          <div>
+            <div class="section-no">06 · PARAMETERS &amp; GRADIENTS</div>
+            <h2 id="weightsTitle">参数矩阵</h2>
+            <p>大数字是当前权重；下方小字是本轮全批量损失对它的梯度。</p>
+          </div>
+          <span class="tag">9 trainable scalars</span>
+        </div>
+        <div class="weights-grid">
+          <div class="weights-matrices">
+            <div class="matrix-group">
+              <div class="matrix-title"><b>W₁</b><span>输入 → 隐藏 · 2×2</span></div>
+              <div class="matrix-layout">
+                <div class="axis-labels"><span>x₁</span><span>x₂</span></div>
+                <div class="matrix" id="w1Matrix"></div>
+              </div>
+              <div class="matrix-foot"><span>列：h₁&nbsp;&nbsp;&nbsp;h₂</span></div>
+              <div class="bias-block" id="biasH"></div>
+            </div>
+            <div class="matrix-group">
+              <div class="matrix-title"><b>w₂, b₂</b><span>隐藏 → 输出</span></div>
+              <div class="matrix" id="w2Matrix" style="grid-template-columns:1fr"></div>
+              <div class="bias-block one" id="biasOut"></div>
+              <div class="matrix-foot"><span>输出层先给出 logit</span></div>
+            </div>
+          </div>
+          <div class="optimizer-note">
+            <div class="gradient-chain">
+              δ<sub>o</sub> = p − y<br>
+              δ<sub>h</sub> = (w₂δ<sub>o</sub>) ⊙ h ⊙ (1 − h)<br>
+              <b>∂L/∂W₁ = x δ<sub>h</sub>ᵀ / 4</b>
+            </div>
+            <p>输出层权重按隐藏激活 h 加权；隐藏层梯度再乘 sigmoid 导数 h(1−h)，这是误差向输入方向传播的链式法则。</p>
+            <p>Adam 对每个参数维护一阶、二阶动量，并做偏差修正。此处学习率 0.08，β₁=0.9，β₂=0.999。</p>
+          </div>
+        </div>
+      </article>
+
+      <section class="reading-guide" aria-label="读图提示">
+        <article class="guide-item">
+          <div class="guide-no">01 / COLOR</div>
+          <h3>热力颜色是输出概率</h3>
+          <p>青色倾向类别 0，橙色倾向类别 1；越鲜艳表示模型越有把握。</p>
+        </article>
+        <article class="guide-item">
+          <div class="guide-no">02 / CONTOURS</div>
+          <h3>隐藏神经元先改变坐标</h3>
+          <p>h₁、h₂ 把原来的 x₁、x₂ 投影到两个一维激活轴上；输出层再对它们做加权组合。</p>
+        </article>
+        <article class="guide-item">
+          <div class="guide-no">03 / BOUNDARY</div>
+          <h3>白线来自 logit = 0</h3>
+          <p>σ(z)=0.5 等价于 z=0。隐藏层 sigmoid 让这条边界可以弯曲成 XOR 所需的对角结构。</p>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      <p>教学实现：固定初值 + 全批量训练 + 浏览器内手写反向传播。页面保存第 0–600 epoch 的 601 组权重、梯度与损失快照；调整滑块不会访问网络。PyTorch 核对脚本使用相同的参数顺序、浮点精度与初始化。</p>
+      <span class="footer-mark">XOR / 2·2·1 / SINGLE HTML</span>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      // ============================================================
+      // 1. 固定实验设置
+      // ------------------------------------------------------------
+      // 为了让浏览器结果和 train_xor_mlp.py 可逐项核对，这里不使用随机初始化。
+      // W1 的第一维是输入 x1/x2，第二维是隐藏神经元 h1/h2。
+      // ============================================================
+      const TOTAL_EPOCHS = 600;
+      const LEARNING_RATE = 0.08;
+      const BETA1 = 0.9;
+      const BETA2 = 0.999;
+      const ADAM_EPS = 1e-8;
+
+      const INITIAL_PARAMS = {
+        W1: [[1.15, -0.95], [-0.95, 1.15]],
+        b1: [-0.25, -0.25],
+        w2: [1.70, 1.70],
+        b2: -0.65
+      };
+
+      // 顺序与 PyTorch 脚本中的 [W1.reshape(-1), b1, w2, b2] 一致。
+      const SAMPLES = [
+        { x: [0, 0], y: 0 },
+        { x: [0, 1], y: 1 },
+        { x: [1, 0], y: 1 },
+        { x: [1, 1], y: 0 }
+      ];
+
+      const COLORS = {
+        teal: "#54d6c4",
+        orange: "#ff9b70",
+        yellow: "#ffd36b",
+        blue: "#77adff",
+        white: "#f7f8ef",
+        lime: "#d8f474",
+        muted: "#91a39f",
+        faint: "#647773"
+      };
+
+      // 可选分享链接，例如 ?epoch=50。非法值会回退到最终训练结果。
+      const epochParam = new URLSearchParams(window.location.search).get("epoch");
+      const requestedEpoch = epochParam === null ? Number.NaN : Number(epochParam);
+      const initialEpoch = Number.isInteger(requestedEpoch)
+        ? Math.max(0, Math.min(TOTAL_EPOCHS, requestedEpoch))
+        : TOTAL_EPOCHS;
+
+      const state = {
+        epoch: initialEpoch,
+        selected: 1,
+        playing: false,
+        animationStart: 0,
+        animationFrom: 0,
+        animationDuration: 6500,
+        hover: null,
+        renderQueued: false,
+        lastAnimatedPaint: 0
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const epochRange = $("epochRange");
+      const playBtn = $("playBtn");
+      const boundaryCanvas = $("boundaryCanvas");
+      const lossCanvas = $("lossCanvas");
+      const tooltip = $("canvasTooltip");
+
+      // ============================================================
+      // 2. 纯 JavaScript 模型
+      // ------------------------------------------------------------
+      // 每个 epoch 先记录“更新前”的参数、损失和梯度，然后做一次 Adam step。
+      // 因此滑块值 e 对应教材中 “完成 e 次更新后” 的状态。
+      // ============================================================
+      function sigmoid(z) {
+        // 分支写法避免 exp(很大的正数) 溢出。
+        if (z >= 0) return 1 / (1 + Math.exp(-z));
+        const e = Math.exp(z);
+        return e / (1 + e);
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function cloneParams(params) {
+        return {
+          W1: params.W1.map((row) => [...row]),
+          b1: [...params.b1],
+          w2: [...params.w2],
+          b2: params.b2
+        };
+      }
+
+      function flattenParams(params) {
+        return [
+          params.W1[0][0], params.W1[0][1],
+          params.W1[1][0], params.W1[1][1],
+          params.b1[0], params.b1[1],
+          params.w2[0], params.w2[1], params.b2
+        ];
+      }
+
+      function paramsFromFlat(flat) {
+        return {
+          W1: [[flat[0], flat[1]], [flat[2], flat[3]]],
+          b1: [flat[4], flat[5]],
+          w2: [flat[6], flat[7]],
+          b2: flat[8]
+        };
+      }
+
+      function forward(params, x1, x2) {
+        const z1 = x1 * params.W1[0][0] + x2 * params.W1[1][0] + params.b1[0];
+        const z2 = x1 * params.W1[0][1] + x2 * params.W1[1][1] + params.b1[1];
+        const h1 = sigmoid(z1);
+        const h2 = sigmoid(z2);
+        const logit = h1 * params.w2[0] + h2 * params.w2[1] + params.b2;
+        const prob = sigmoid(logit);
+        return { x1, x2, z1, z2, h1, h2, logit, prob };
+      }
+
+      function binaryCrossEntropyFromLogit(logit, target) {
+        // BCEWithLogits 的稳定形式：
+        // max(z, 0) - z·y + log(1 + exp(-|z|))
+        return Math.max(logit, 0) - target * logit + Math.log1p(Math.exp(-Math.abs(logit)));
+      }
+
+      function evaluateBatch(params) {
+        const predictions = SAMPLES.map((sample) => ({
+          ...forward(params, sample.x[0], sample.x[1]),
+          target: sample.y
+        }));
+
+        let loss = 0;
+        let correct = 0;
+        for (const prediction of predictions) {
+          loss += binaryCrossEntropyFromLogit(prediction.logit, prediction.target);
+          correct += Number((prediction.prob >= 0.5) === Boolean(prediction.target));
+        }
+        loss /= SAMPLES.length;
+
+        // 手写反向传播。输出层 dL/dz 先除以 batch size，
+        // 后面的层都沿用这个已求平均的误差，因此不再重复除一次。
+        const grads = new Array(9).fill(0);
+        SAMPLES.forEach((sample, index) => {
+          const prediction = predictions[index];
+          const dLogit = (prediction.prob - sample.y) / SAMPLES.length;
+
+          grads[6] += dLogit * prediction.h1;
+          grads[7] += dLogit * prediction.h2;
+          grads[8] += dLogit;
+
+          const dHidden1 = dLogit * params.w2[0];
+          const dHidden2 = dLogit * params.w2[1];
+          const dZ1 = dHidden1 * prediction.h1 * (1 - prediction.h1);
+          const dZ2 = dHidden2 * prediction.h2 * (1 - prediction.h2);
+          const [x1, x2] = sample.x;
+
+          grads[0] += x1 * dZ1; // x1 -> h1
+          grads[2] += x2 * dZ1; // x2 -> h1
+          grads[4] += dZ1;       // bias h1
+          grads[1] += x1 * dZ2; // x1 -> h2
+          grads[3] += x2 * dZ2; // x2 -> h2
+          grads[5] += dZ2;       // bias h2
+        });
+
+        return {
+          loss,
+          accuracy: correct / SAMPLES.length,
+          predictions,
+          grads
+        };
+      }
+
+      function trainAndRecord() {
+        let params = cloneParams(INITIAL_PARAMS);
+        let flat = flattenParams(params);
+        const firstMoment = new Array(9).fill(0);
+        const secondMoment = new Array(9).fill(0);
+        const history = [];
+
+        for (let epoch = 0; epoch <= TOTAL_EPOCHS; epoch++) {
+          params = paramsFromFlat(flat);
+          const result = evaluateBatch(params);
+
+          history.push({
+            epoch,
+            params: cloneParams(params),
+            loss: result.loss,
+            accuracy: result.accuracy,
+            grads: [...result.grads],
+            maxWeight: Math.max(...flattenParams(params).map(Math.abs)),
+            gradNorm: Math.hypot(...result.grads)
+          });
+
+          if (epoch === TOTAL_EPOCHS) break;
+
+          // 全批量 Adam 更新。bias correction 使用已经完成的更新次数 t。
+          const t = epoch + 1;
+          const nextFlat = [...flat];
+          for (let index = 0; index < flat.length; index++) {
+            const grad = result.grads[index];
+            firstMoment[index] = BETA1 * firstMoment[index] + (1 - BETA1) * grad;
+            secondMoment[index] = BETA2 * secondMoment[index] + (1 - BETA2) * grad * grad;
+            const mHat = firstMoment[index] / (1 - Math.pow(BETA1, t));
+            const vHat = secondMoment[index] / (1 - Math.pow(BETA2, t));
+            nextFlat[index] -= LEARNING_RATE * mHat / (Math.sqrt(vHat) + ADAM_EPS);
+          }
+          flat = nextFlat;
+        }
+
+        return history;
+      }
+
+      const history = trainAndRecord();
+
+      // 便于在浏览器控制台继续教学或做数值核对。
+      window.XOR_MLP_LAB = {
+        history,
+        samples: SAMPLES,
+        config: {
+          totalEpochs: TOTAL_EPOCHS,
+          learningRate: LEARNING_RATE,
+          beta1: BETA1,
+          beta2: BETA2,
+          adamEpsilon: ADAM_EPS
+        },
+        forward: (params, x1, x2) => forward(params, x1, x2)
+      };
+
+      // ============================================================
+      // 3. 格式化与界面渲染
+      // ============================================================
+      function fmt(value, digits = 4) {
+        if (!Number.isFinite(value)) return "—";
+        const corrected = Math.abs(value) < 0.5 * Math.pow(10, -digits) ? 0 : value;
+        return corrected.toFixed(digits);
+      }
+
+      function fmtSigned(value, digits = 3) {
+        const text = fmt(value, digits);
+        return Number(text) >= 0 ? `+${text}` : text;
+      }
+
+      function scheduleRender() {
+        if (state.renderQueued) return;
+        state.renderQueued = true;
+        requestAnimationFrame(() => {
+          state.renderQueued = false;
+          renderAll();
+        });
+      }
+
+      function currentSnapshot() {
+        return history[state.epoch];
+      }
+
+      function selectedPrediction(snapshot = currentSnapshot()) {
+        const sample = SAMPLES[state.selected];
+        return { ...forward(snapshot.params, sample.x[0], sample.x[1]), target: sample.y };
+      }
+
+      function updateTimelineAndMetrics() {
+        const snapshot = currentSnapshot();
+        const percentage = state.epoch / TOTAL_EPOCHS * 100;
+        epochRange.value = String(state.epoch);
+        epochRange.style.setProperty("--range-progress", `${percentage}%`);
+        epochRange.setAttribute("aria-valuetext", `第 ${state.epoch} 轮，损失 ${fmt(snapshot.loss, 5)}`);
+        $("epochValue").textContent = String(state.epoch);
+        $("timelineTitle").textContent = state.epoch === TOTAL_EPOCHS
+          ? "训练完成：四个 XOR 样本全部分类正确"
+          : `第 ${state.epoch} 轮：观察参数与决策面如何变化`;
+        $("networkEpochTag").textContent = `epoch ${state.epoch}`;
+        $("lossValue").textContent = fmt(snapshot.loss, 5);
+        $("accuracyValue").textContent = `${Math.round(snapshot.accuracy * 100)}%`;
+        $("maxWeightValue").textContent = fmt(snapshot.maxWeight, 3);
+        $("gradNormValue").textContent = fmt(snapshot.gradNorm, 3);
+        $("lossTag").textContent = $("logScale").checked ? "log scale" : "linear scale";
+        playBtn.textContent = state.playing ? "暂停" : (state.epoch >= TOTAL_EPOCHS ? "重播" : "播放");
+      }
+
+      function renderLearningPrompt() {
+        const snapshot = currentSnapshot();
+        const sample = SAMPLES[state.selected];
+        const prediction = selectedPrediction(snapshot);
+        const sampleText = `[${sample.x[0]}, ${sample.x[1]}]`;
+        let phase;
+        let prompt;
+        let conclusion;
+
+        if (state.epoch === 0) {
+          phase = "01 · 初始状态";
+          prompt = `<b>初始结论：模型尚未区分 XOR 类别。</b> 四个样本的输出概率都在 0.70 左右，BCE 为 ${fmt(snapshot.loss, 5)}，准确率只有 ${Math.round(snapshot.accuracy * 100)}%。`;
+          conclusion = "单个线性输出只能形成一条仿射决策边界，无法把两个对角样本与另外两个对角样本同时分开。隐藏层先产生两个 sigmoid 非线性特征，输出层再组合它们，因此 p=0.5 的等值线可以在原始输入空间形成非线性结构。";
+        } else if (state.epoch < 50) {
+          phase = "02 · 误差回传";
+          prompt = `<b>阶段结论：误差正在推动两组参数协同变化。</b> 当前 loss 为 ${fmt(snapshot.loss, 5)}，梯度范数为 ${fmt(snapshot.gradNorm, 4)}。W₁ 的两条对角线保持相反符号，两个隐藏神经元由此学习两种互补的输入方向。`;
+          conclusion = "反向传播先由输出误差得到 δo=p−y，再乘 w₂ 传回隐藏层。隐藏层梯度还必须乘 sigmoid 的局部导数 h(1−h)，这是链式法则的一部分；前向的 sigmoid 提供非线性，反向的 h(1−h) 则负责正确缩放并传递梯度。";
+        } else if (state.epoch < 200) {
+          phase = "03 · 对照样本";
+          prompt = `<b>阶段结论：隐藏层已经形成可区分的中间表示。</b> 当前样本 ${sampleText} 的 h₁=${fmt(prediction.h1, 3)}、h₂=${fmt(prediction.h2, 3)}，输出概率为 ${fmt(prediction.prob, 3)}。切换 XOR 样本可以看到两个隐藏激活发生相应变化。`;
+          conclusion = "隐藏层不是按原始二维距离复制输入，而是沿 W₁ 的两个方向重新投影，再经过 sigmoid 变成 h₁、h₂。投影后的数值不同，输出层就能把样本映射到不同概率，因此原始空间中的“接近”不等于隐藏表示中的“相同”。";
+        } else if (state.epoch < TOTAL_EPOCHS) {
+          phase = "04 · 读决策面";
+          prompt = `<b>阶段结论：决策区域由隐藏表示和输出权重共同决定。</b> 当前最大权重为 ${fmt(snapshot.maxWeight, 3)}，较大的 w₂ 会把两个隐藏激活的差异放大成更明确的概率。`;
+          conclusion = "网络先计算 h=σ(W₁ᵀx+b₁)，再计算输出 logit z=w₂ᵀh+b₂。白线是 z=0 在原输入空间中的等值线，由两个 sigmoid 激活共同决定；h₁、h₂ 等高线分别展示两个隐藏特征对最终区域的不同贡献。";
+        } else {
+          phase = "05 · 训练完成";
+          prompt = `<b>最终结论：2-2-1 MLP 已正确学习 XOR。</b> 四个样本全部预测正确，BCE 降至 ${fmt(snapshot.loss, 5)}。当前 ${sampleText} 的输出概率为 ${fmt(prediction.prob, 3)}。`;
+          conclusion = "两个隐藏神经元的 sigmoid 是形成非线性决策区域的关键。若去掉该非线性，h=W₁ᵀx+b₁，输出会化为 z=(W₁w₂)ᵀx+(w₂ᵀb₁+b₂)，整个网络退化为单个仿射分类器，无法完成 XOR。";
+        }
+
+        $("learningPrompt").innerHTML = prompt;
+        $("promptConclusion").textContent = conclusion;
+        $("promptPhase").textContent = phase;
+        $("promptFacts").innerHTML = `
+          <span class="prompt-fact">样本<b>${sampleText} → ${sample.y}</b></span>
+          <span class="prompt-fact">h₁ / h₂<b>${fmt(prediction.h1, 3)} / ${fmt(prediction.h2, 3)}</b></span>
+          <span class="prompt-fact">BCE<b>${fmt(snapshot.loss, 5)}</b></span>
+          <span class="prompt-fact">ACC<b>${Math.round(snapshot.accuracy * 100)}%</b></span>
+        `;
+        $("promptNextBtn").textContent = state.epoch >= TOTAL_EPOCHS
+          ? "回到初始观察 →"
+          : "跳到下一观察点 →";
+      }
+
+      function renderSampleTabs() {
+        const snapshot = currentSnapshot();
+        $("sampleTabs").innerHTML = SAMPLES.map((sample, index) => {
+          const prediction = forward(snapshot.params, sample.x[0], sample.x[1]);
+          const active = index === state.selected ? " active" : "";
+          return `
+            <button class="sample-btn${active}" type="button" data-sample="${index}" aria-pressed="${index === state.selected}">
+              <b>[${sample.x[0]}, ${sample.x[1]}] → ${sample.y}</b>
+              <span>p = ${fmt(prediction.prob, 3)}</span>
+            </button>
+          `;
+        }).join("");
+
+        $("sampleTabs").querySelectorAll("[data-sample]").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.selected = Number(button.dataset.sample);
+            scheduleRender();
+          });
+        });
+      }
+
+      function weightTag(x, y, weight) {
+        const text = fmtSigned(weight, 2);
+        const width = 50;
+        return `
+          <g>
+            <rect x="${x - width / 2}" y="${y - 8}" width="${width}" height="16" rx="5" fill="#0a1317" fill-opacity=".86" stroke="rgba(255,255,255,.07)"/>
+            <text class="weight-tag-text" x="${x}" y="${y + 0.5}">${text}</text>
+          </g>
+        `;
+      }
+
+      function edgeSvg(x1, y1, x2, y2, weight, marker) {
+        const color = weight >= 0 ? COLORS.teal : COLORS.orange;
+        const width = 1.15 + Math.sqrt(Math.abs(weight)) * 1.08;
+        return `<line class="edge" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width.toFixed(2)}" stroke-opacity="${clamp(0.38 + Math.abs(weight) / 22, 0.38, 0.8).toFixed(2)}" marker-end="url(#${marker})"/>`;
+      }
+
+      function nodeSvg(x, y, radius, label, valueText, activation, kind) {
+        const accent = kind === "hidden" ? COLORS.blue : (kind === "output" ? COLORS.lime : COLORS.white);
+        const fillOpacity = 0.045 + clamp(activation, 0, 1) * 0.31;
+        const progress = clamp(activation, 0, 1);
+        const circumference = 2 * Math.PI * (radius + 5);
+        const sub = kind === "input" ? "INPUT" : (kind === "hidden" ? "SIGMOID" : "P(Y=1)");
+        return `
+          <g>
+            <circle cx="${x}" cy="${y}" r="${radius + 5}" fill="none" stroke="rgba(255,255,255,.055)" stroke-width="2"/>
+            <circle cx="${x}" cy="${y}" r="${radius + 5}" fill="none" stroke="${accent}" stroke-opacity=".48"
+              stroke-width="2" stroke-dasharray="${(progress * circumference).toFixed(2)} ${circumference.toFixed(2)}"
+              stroke-linecap="round" transform="rotate(-90 ${x} ${y})"/>
+            <circle class="node-shell" cx="${x}" cy="${y}" r="${radius}" fill="${accent}" fill-opacity="${fillOpacity.toFixed(3)}" stroke="${accent}" stroke-opacity=".65"/>
+            <text class="node-label" x="${x}" y="${y - 3}">${label}</text>
+            <text class="node-value" x="${x}" y="${y + 14}">${valueText}</text>
+            <text class="node-sub" x="${x}" y="${y + radius + 20}">${sub}</text>
+          </g>
+        `;
+      }
+
+      function renderNetwork() {
+        const snapshot = currentSnapshot();
+        const params = snapshot.params;
+        const prediction = selectedPrediction(snapshot);
+
+        const x1 = { x: 94, y: 132 };
+        const x2 = { x: 94, y: 307 };
+        const h1 = { x: 314, y: 107 };
+        const h2 = { x: 314, y: 342 };
+        const out = { x: 534, y: 226 };
+
+        // 箭头先到节点外缘，避免盖住节点文字。
+        const edges = [
+          edgeSvg(x1.x + 43, x1.y + 8, h1.x - 48, h1.y + 17, params.W1[0][0], "arrowPos"),
+          edgeSvg(x2.x + 44, x2.y - 11, h1.x - 49, h1.y + 30, params.W1[1][0], "arrowNeg"),
+          edgeSvg(x1.x + 43, x1.y + 27, h2.x - 50, h2.y - 24, params.W1[0][1], "arrowNeg"),
+          edgeSvg(x2.x + 43, x2.y - 12, h2.x - 48, h2.y - 17, params.W1[1][1], "arrowPos"),
+          edgeSvg(h1.x + 48, h1.y + 17, out.x - 57, out.y - 22, params.w2[0], "arrowPos"),
+          edgeSvg(h2.x + 48, h2.y - 16, out.x - 57, out.y + 22, params.w2[1], "arrowPos")
+        ].join("");
+
+        $("networkSvg").innerHTML = `
+          <defs>
+            <marker id="arrowPos" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L8,4 L0,8 Z" fill="${COLORS.teal}" fill-opacity=".8"/>
+            </marker>
+            <marker id="arrowNeg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L8,4 L0,8 Z" fill="${COLORS.orange}" fill-opacity=".8"/>
+            </marker>
+          </defs>
+          <text class="layer-name" x="${x1.x}" y="35">INPUT</text>
+          <text class="layer-name" x="${h1.x}" y="35">HIDDEN</text>
+          <text class="layer-name" x="${out.x}" y="35">OUTPUT</text>
+          ${edges}
+          ${weightTag(195, 105, params.W1[0][0])}
+          ${weightTag(210, 204, params.W1[1][0])}
+          ${weightTag(207, 244, params.W1[0][1])}
+          ${weightTag(195, 323, params.W1[1][1])}
+          ${weightTag(425, 148, params.w2[0])}
+          ${weightTag(425, 305, params.w2[1])}
+          ${nodeSvg(x1.x, x1.y, 39, "x₁", fmt(SAMPLES[state.selected].x[0], 1), SAMPLES[state.selected].x[0], "input")}
+          ${nodeSvg(x2.x, x2.y, 39, "x₂", fmt(SAMPLES[state.selected].x[1], 1), SAMPLES[state.selected].x[1], "input")}
+          ${nodeSvg(h1.x, h1.y, 40, "h₁", fmt(prediction.h1, 3), prediction.h1, "hidden")}
+          ${nodeSvg(h2.x, h2.y, 40, "h₂", fmt(prediction.h2, 3), prediction.h2, "hidden")}
+          ${nodeSvg(out.x, out.y, 48, "ŷ", fmt(prediction.prob, 3), prediction.prob, "output")}
+        `;
+      }
+
+      // ============================================================
+      // 4. Canvas：决策边界与两个隐藏激活等高线
+      // ============================================================
+      function prepareCanvas(canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const cssWidth = Math.max(1, rect.width);
+        const cssHeight = Math.max(1, rect.height);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const pixelWidth = Math.round(cssWidth * dpr);
+        const pixelHeight = Math.round(cssHeight * dpr);
+        if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+          canvas.width = pixelWidth;
+          canvas.height = pixelHeight;
+        }
+        const ctx = canvas.getContext("2d");
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        return { ctx, width: cssWidth, height: cssHeight, dpr };
+      }
+
+      function probabilityField(params) {
+        const cells = 110;
+        const offscreen = document.createElement("canvas");
+        offscreen.width = cells;
+        offscreen.height = cells;
+        const octx = offscreen.getContext("2d");
+        const image = octx.createImageData(cells, cells);
+        const domainMin = -0.14;
+        const domainMax = 1.14;
+
+        for (let row = 0; row < cells; row++) {
+          const x2 = domainMax - (row + 0.5) / cells * (domainMax - domainMin);
+          for (let col = 0; col < cells; col++) {
+            const x1 = domainMin + (col + 0.5) / cells * (domainMax - domainMin);
+            const probability = forward(params, x1, x2).prob;
+            const confidence = Math.abs(probability - 0.5) * 2;
+            const index = (row * cells + col) * 4;
+            if (probability < 0.5) {
+              image.data[index] = 33;
+              image.data[index + 1] = 180;
+              image.data[index + 2] = 165;
+            } else {
+              image.data[index] = 255;
+              image.data[index + 1] = 123;
+              image.data[index + 2] = 77;
+            }
+            image.data[index + 3] = Math.round(22 + confidence * 126);
+          }
+        }
+        octx.putImageData(image, 0, 0);
+        return offscreen;
+      }
+
+      function makeGridField(params, evaluator, size = 118) {
+        const domainMin = -0.14;
+        const domainMax = 1.14;
+        const values = new Float32Array(size * size);
+        for (let row = 0; row < size; row++) {
+          const x2 = domainMax - row / (size - 1) * (domainMax - domainMin);
+          for (let col = 0; col < size; col++) {
+            const x1 = domainMin + col / (size - 1) * (domainMax - domainMin);
+            values[row * size + col] = evaluator(params, x1, x2);
+          }
+        }
+        return { values, size, domainMin, domainMax };
+      }
+
+      function fieldSegments(field, level) {
+        const { values, size } = field;
+        const segments = [];
+        const interpolate = (a, b) => {
+          const denominator = a - b;
+          if (Math.abs(denominator) < 1e-12) return 0.5;
+          return clamp((a - level) / denominator, 0, 1);
+        };
+
+        for (let row = 0; row < size - 1; row++) {
+          for (let col = 0; col < size - 1; col++) {
+            const tl = values[row * size + col];
+            const tr = values[row * size + col + 1];
+            const br = values[(row + 1) * size + col + 1];
+            const bl = values[(row + 1) * size + col];
+            const points = [];
+
+            if ((tl - level) * (tr - level) < 0) {
+              const t = interpolate(tl, tr);
+              points.push([col + t, row]);
+            }
+            if ((tr - level) * (br - level) < 0) {
+              const t = interpolate(tr, br);
+              points.push([col + 1, row + t]);
+            }
+            if ((bl - level) * (br - level) < 0) {
+              const t = interpolate(bl, br);
+              points.push([col + t, row + 1]);
+            }
+            if ((tl - level) * (bl - level) < 0) {
+              const t = interpolate(tl, bl);
+              points.push([col, row + t]);
+            }
+
+            if (points.length === 2) {
+              segments.push([points[0], points[1]]);
+            } else if (points.length === 4) {
+              // 极少见的鞍点情况：按中心值与左上角同侧与否配对。
+              const center = (tl + tr + br + bl) / 4;
+              if ((tl - level) * (center - level) >= 0) {
+                segments.push([points[0], points[1]], [points[2], points[3]]);
+              } else {
+                segments.push([points[1], points[2]], [points[3], points[0]]);
+              }
+            }
+          }
+        }
+        return segments;
+      }
+
+      function drawSegments(ctx, segments, field, toPixel, style) {
+        if (!segments.length) return null;
+        ctx.save();
+        ctx.strokeStyle = style.color;
+        ctx.lineWidth = style.width;
+        ctx.globalAlpha = style.opacity;
+        ctx.setLineDash(style.dash || []);
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        for (const segment of segments) {
+          const [a, b] = segment;
+          const xa = field.domainMin + a[0] / (field.size - 1) * (field.domainMax - field.domainMin);
+          const ya = field.domainMax - a[1] / (field.size - 1) * (field.domainMax - field.domainMin);
+          const xb = field.domainMin + b[0] / (field.size - 1) * (field.domainMax - field.domainMin);
+          const yb = field.domainMax - b[1] / (field.size - 1) * (field.domainMax - field.domainMin);
+          const pa = toPixel(xa, ya);
+          const pb = toPixel(xb, yb);
+          ctx.moveTo(pa.x, pa.y);
+          ctx.lineTo(pb.x, pb.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // 每条等高线只标一个点，避免视觉噪声。
+        let labelSegment = segments[Math.floor(segments.length * 0.63)] || segments[0];
+        for (let i = 0; i < segments.length; i++) {
+          const midpointCol = (segments[i][0][0] + segments[i][1][0]) / 2;
+          const midpointRow = (segments[i][0][1] + segments[i][1][1]) / 2;
+          if (midpointCol > field.size * 0.65 && midpointCol < field.size * 0.88 &&
+              midpointRow > field.size * 0.18 && midpointRow < field.size * 0.82) {
+            labelSegment = segments[i];
+            break;
+          }
+        }
+        const labelCol = (labelSegment[0][0] + labelSegment[1][0]) / 2;
+        const labelRow = (labelSegment[0][1] + labelSegment[1][1]) / 2;
+        const labelX = field.domainMin + labelCol / (field.size - 1) * (field.domainMax - field.domainMin);
+        const labelY = field.domainMax - labelRow / (field.size - 1) * (field.domainMax - field.domainMin);
+        return toPixel(labelX, labelY);
+      }
+
+      function drawContourLabel(ctx, point, text, color) {
+        if (!point) return;
+        ctx.save();
+        ctx.font = "9px " + getComputedStyle(document.body).getPropertyValue("--mono");
+        const width = ctx.measureText(text).width + 9;
+        ctx.fillStyle = "rgba(7, 13, 16, .82)";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(point.x - width / 2, point.y - 8, width, 16, 4);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, point.x, point.y + 0.5);
+        ctx.restore();
+      }
+
+      function drawBoundary() {
+        const { ctx, width, height } = prepareCanvas(boundaryCanvas);
+        const params = currentSnapshot().params;
+        const padding = {
+          left: width < 500 ? 39 : 51,
+          right: width < 500 ? 16 : 24,
+          top: 24,
+          bottom: width < 500 ? 38 : 43
+        };
+        const plotWidth = width - padding.left - padding.right;
+        const plotHeight = height - padding.top - padding.bottom;
+        const domainMin = -0.14;
+        const domainMax = 1.14;
+        const toPixel = (x1, x2) => ({
+          x: padding.left + (x1 - domainMin) / (domainMax - domainMin) * plotWidth,
+          y: padding.top + (domainMax - x2) / (domainMax - domainMin) * plotHeight
+        });
+
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = "#0a1317";
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(padding.left, padding.top, plotWidth, plotHeight);
+        ctx.clip();
+        if ($("showHeat").checked) {
+          const heat = probabilityField(params);
+          ctx.imageSmoothingEnabled = true;
+          ctx.globalAlpha = 0.92;
+          ctx.drawImage(heat, padding.left, padding.top, plotWidth, plotHeight);
+          ctx.globalAlpha = 1;
+        }
+
+        // 细网格帮助把四个 XOR 点与坐标对应起来。
+        ctx.strokeStyle = "rgba(230, 245, 236, .075)";
+        ctx.lineWidth = 1;
+        for (let value = 0; value <= 1.0001; value += 0.25) {
+          const vertical = toPixel(value, 0).x;
+          const horizontal = toPixel(0, value).y;
+          ctx.beginPath(); ctx.moveTo(vertical, padding.top); ctx.lineTo(vertical, padding.top + plotHeight); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(padding.left, horizontal); ctx.lineTo(padding.left + plotWidth, horizontal); ctx.stroke();
+        }
+
+        if ($("showH1").checked) {
+          const h1Field = makeGridField(params, (p, x1, x2) => forward(p, x1, x2).h1);
+          const levels = [0.2, 0.5, 0.8];
+          levels.forEach((level, index) => {
+            const labelPoint = drawSegments(ctx, fieldSegments(h1Field, level), h1Field, toPixel, {
+              color: COLORS.blue,
+              width: level === 0.5 ? 1.45 : 1,
+              opacity: level === 0.5 ? 0.88 : 0.46
+            });
+            if (level === 0.5) drawContourLabel(ctx, labelPoint, "h₁ = 0.5", COLORS.blue);
+          });
+        }
+
+        if ($("showH2").checked) {
+          const h2Field = makeGridField(params, (p, x1, x2) => forward(p, x1, x2).h2);
+          const levels = [0.2, 0.5, 0.8];
+          levels.forEach((level, index) => {
+            const labelPoint = drawSegments(ctx, fieldSegments(h2Field, level), h2Field, toPixel, {
+              color: COLORS.yellow,
+              width: level === 0.5 ? 1.55 : 1,
+              opacity: level === 0.5 ? 0.9 : 0.44,
+              dash: [5, 4]
+            });
+            if (level === 0.5) drawContourLabel(ctx, labelPoint, "h₂ = 0.5", COLORS.yellow);
+          });
+        }
+
+        // 输出概率的 0.5 等值线就是 z=0 决策边界。
+        const probabilityGrid = makeGridField(params, (p, x1, x2) => forward(p, x1, x2).prob);
+        ctx.save();
+        ctx.shadowColor = "rgba(247, 248, 239, .32)";
+        ctx.shadowBlur = 5;
+        drawSegments(ctx, fieldSegments(probabilityGrid, 0.5), probabilityGrid, toPixel, {
+          color: COLORS.white,
+          width: 2.5,
+          opacity: 0.97
+        });
+        ctx.restore();
+
+        // 添加一点边缘暗角，让中心数据更醒目。
+        const vignette = ctx.createRadialGradient(
+          padding.left + plotWidth / 2, padding.top + plotHeight / 2, plotHeight * 0.18,
+          padding.left + plotWidth / 2, padding.top + plotHeight / 2, plotHeight * 0.8
+        );
+        vignette.addColorStop(0, "rgba(5, 12, 15, 0)");
+        vignette.addColorStop(1, "rgba(5, 12, 15, .25)");
+        ctx.fillStyle = vignette;
+        ctx.fillRect(padding.left, padding.top, plotWidth, plotHeight);
+        ctx.restore();
+
+        // 坐标轴刻度。
+        ctx.save();
+        ctx.strokeStyle = "rgba(230, 245, 236, .22)";
+        ctx.fillStyle = COLORS.faint;
+        ctx.font = "9px " + getComputedStyle(document.body).getPropertyValue("--mono");
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        for (let value = 0; value <= 1.0001; value += 0.25) {
+          const point = toPixel(value, 0);
+          const tickText = value.toFixed(2).replace(/0$/, "");
+          ctx.fillText(tickText, point.x, padding.top + plotHeight + 8);
+        }
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        for (let value = 0; value <= 1.0001; value += 0.25) {
+          const point = toPixel(0, value);
+          ctx.fillText(value.toFixed(2).replace(/0$/, ""), padding.left - 9, point.y);
+        }
+        ctx.textAlign = "right";
+        ctx.textBaseline = "bottom";
+        ctx.fillStyle = "#b8c6c1";
+        ctx.font = "10px " + getComputedStyle(document.body).getPropertyValue("--mono");
+        ctx.fillText("x₁", padding.left + plotWidth, height - 4);
+        ctx.save();
+        ctx.translate(12, padding.top);
+        ctx.rotate(-Math.PI / 2);
+        ctx.textAlign = "left";
+        ctx.fillText("x₂", 0, 0);
+        ctx.restore();
+        ctx.restore();
+
+        // 四个训练样本用描边圆点覆盖在热力图上。
+        SAMPLES.forEach((sample, index) => {
+          const point = toPixel(sample.x[0], sample.x[1]);
+          const pointColor = sample.y === 0 ? COLORS.teal : COLORS.orange;
+          ctx.save();
+          if (index === state.selected) {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 15, 0, Math.PI * 2);
+            ctx.strokeStyle = COLORS.lime;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, 9.5, 0, Math.PI * 2);
+          ctx.fillStyle = "#f8f7ed";
+          ctx.fill();
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = pointColor;
+          ctx.stroke();
+          ctx.fillStyle = "#17211d";
+          ctx.font = "700 10px " + getComputedStyle(document.body).getPropertyValue("--mono");
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(String(sample.y), point.x, point.y + 0.5);
+          ctx.restore();
+        });
+
+        if (state.hover) {
+          const point = toPixel(state.hover.x1, state.hover.x2);
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+          ctx.fillStyle = COLORS.lime;
+          ctx.fill();
+          ctx.strokeStyle = "#0a1317";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // ============================================================
+      // 5. 损失曲线与其他面板
+      // ============================================================
+      function drawLossChart() {
+        const { ctx, width, height } = prepareCanvas(lossCanvas);
+        const snapshot = currentSnapshot();
+        const useLog = $("logScale").checked;
+        const padding = { left: 48, right: 20, top: 18, bottom: 35 };
+        const plotWidth = width - padding.left - padding.right;
+        const plotHeight = height - padding.top - padding.bottom;
+        const xOf = (epoch) => padding.left + epoch / TOTAL_EPOCHS * plotWidth;
+
+        const logValues = history.map((item) => Math.log10(Math.max(item.loss, 1e-6)));
+        const logMin = Math.floor(Math.min(...logValues)) - 0.15;
+        const logMax = Math.max(0.15, Math.ceil(Math.max(...logValues) * 10) / 10);
+        const yOf = (loss) => {
+          if (!useLog) {
+            const maxLoss = Math.max(0.9, ...history.map((item) => item.loss));
+            return padding.top + (1 - loss / maxLoss) * plotHeight;
+          }
+          const normalized = (Math.log10(Math.max(loss, 1e-6)) - logMin) / (logMax - logMin);
+          return padding.top + (1 - normalized) * plotHeight;
+        };
+
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = "#0b1418";
+        ctx.fillRect(0, 0, width, height);
+        ctx.font = "9px " + getComputedStyle(document.body).getPropertyValue("--mono");
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+
+        const yTicks = useLog
+          ? [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 0.9].filter((value) => {
+              const l = Math.log10(value);
+              return l >= logMin && l <= logMax;
+            })
+          : [0, 0.2, 0.4, 0.6, 0.8];
+
+        for (const tick of yTicks) {
+          const y = yOf(tick);
+          ctx.beginPath();
+          ctx.moveTo(padding.left, y);
+          ctx.lineTo(width - padding.right, y);
+          ctx.strokeStyle = "rgba(230,245,236,.075)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = COLORS.faint;
+          ctx.fillText(useLog ? (tick < 1 ? tick.toPrecision(1) : tick.toFixed(1)) : tick.toFixed(1), padding.left - 8, y);
+        }
+
+        [0, 100, 200, 300, 400, 500, 600].forEach((epoch) => {
+          const x = xOf(epoch);
+          ctx.beginPath();
+          ctx.moveTo(x, padding.top);
+          ctx.lineTo(x, padding.top + plotHeight);
+          ctx.strokeStyle = "rgba(230,245,236,.055)";
+          ctx.stroke();
+          ctx.fillStyle = COLORS.faint;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText(String(epoch), x, padding.top + plotHeight + 9);
+        });
+
+        const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + plotHeight);
+        gradient.addColorStop(0, "rgba(216,244,116,.20)");
+        gradient.addColorStop(1, "rgba(84,214,196,.01)");
+
+        ctx.beginPath();
+        history.forEach((item, index) => {
+          const x = xOf(index);
+          const y = yOf(item.loss);
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.lineTo(xOf(TOTAL_EPOCHS), padding.top + plotHeight);
+        ctx.lineTo(xOf(0), padding.top + plotHeight);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        ctx.beginPath();
+        history.forEach((item, index) => {
+          const x = xOf(index);
+          const y = yOf(item.loss);
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = COLORS.lime;
+        ctx.lineWidth = 2;
+        ctx.lineJoin = "round";
+        ctx.stroke();
+
+        const currentX = xOf(state.epoch);
+        const currentY = yOf(snapshot.loss);
+        ctx.beginPath();
+        ctx.moveTo(currentX, padding.top);
+        ctx.lineTo(currentX, padding.top + plotHeight);
+        ctx.strokeStyle = "rgba(216,244,116,.24)";
+        ctx.setLineDash([3, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(currentX, currentY, 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = COLORS.lime;
+        ctx.fill();
+        ctx.strokeStyle = "#0b1418";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = COLORS.muted;
+        ctx.textAlign = "right";
+        ctx.textBaseline = "bottom";
+        ctx.fillStyle = "rgba(216,244,116,.8)";
+        ctx.fillText(`loss ${fmt(snapshot.loss, 4)}`, width - padding.right, padding.top + 1);
+      }
+
+      function renderForward() {
+        const sample = SAMPLES[state.selected];
+        const snapshot = currentSnapshot();
+        const prediction = selectedPrediction(snapshot);
+        const [x1, x2] = sample.x;
+        const params = snapshot.params;
+        const isCorrect = (prediction.prob >= 0.5 ? 1 : 0) === sample.y;
+
+        $("selectedPill").textContent = `x = [${x1}, ${x2}]ᵀ · y = ${sample.y}`;
+        $("forwardSteps").innerHTML = `
+          <div class="calc-step">
+            <span class="step-index">01</span>
+            <div class="step-copy">
+              <strong>输入向量与目标</strong>
+              <code>x = [x₁, x₂]ᵀ = [${x1}, ${x2}]ᵀ &nbsp; · &nbsp; y = ${sample.y}</code>
+            </div>
+            <span class="step-value">x₁=${x1}, x₂=${x2}</span>
+          </div>
+          <div class="calc-step">
+            <span class="step-index">02</span>
+            <div class="step-copy">
+              <strong>隐藏层线性组合</strong>
+              <code>zⱼ = ${x1}·W₁[j,0] + ${x2}·W₁[j,1] + b₁[j]</code>
+            </div>
+            <span class="step-value">z₁=${fmt(prediction.z1)}<br>z₂=${fmt(prediction.z2)}</span>
+          </div>
+          <div class="calc-step">
+            <span class="step-index">03</span>
+            <div class="step-copy">
+              <strong>隐藏层 Sigmoid 激活</strong>
+              <code>hⱼ = σ(zⱼ) = 1 / (1 + e<sup>−zⱼ</sup>)</code>
+            </div>
+            <span class="step-value">h₁=${fmt(prediction.h1)}<br>h₂=${fmt(prediction.h2)}</span>
+          </div>
+          <div class="calc-step">
+            <span class="step-index">04</span>
+            <div class="step-copy">
+              <strong>输出 logit</strong>
+              <code>z = ${fmt(params.w2[0], 3)}·h₁ + ${fmt(params.w2[1], 3)}·h₂ + (${fmt(params.b2, 3)})</code>
+            </div>
+            <span class="step-value">z=${fmt(prediction.logit)}</span>
+          </div>
+          <div class="calc-step">
+            <span class="step-index">05</span>
+            <div class="step-copy">
+              <strong>输出概率与 BCEWithLogits</strong>
+              <code>p = σ(${fmt(prediction.logit, 3)}); &nbsp; ℓ = max(z,0) − yz + log(1+e<sup>−|z|</sup>)</code>
+            </div>
+            <span class="step-value orange">p=${fmt(prediction.prob)}<br>ℓ=${fmt(binaryCrossEntropyFromLogit(prediction.logit, sample.y))}</span>
+          </div>
+          <div class="calc-step">
+            <span class="step-index">06</span>
+            <div class="step-copy">
+              <strong>反向传播的起点</strong>
+              <code>∂ℓ/∂z = p − y；传播到两层时再乘各自的局部导数。</code>
+            </div>
+            <span class="step-value">${fmtSigned(prediction.prob - sample.y, 5)}</span>
+          </div>
+        `;
+
+        $("predictionBar").innerHTML = `
+          <div>
+            <small>${isCorrect ? "PREDICTION MATCHES TARGET" : "PREDICTION DIFFERS FROM TARGET"} · 阈值 0.5</small>
+            <strong>模型预测 ${prediction.prob >= 0.5 ? 1 : 0}，目标 ${sample.y}；对数几率 z = ${fmt(prediction.logit, 3)}。</strong>
+          </div>
+          <div class="probability">${(prediction.prob * 100).toFixed(2)}%</div>
+        `;
+      }
+
+      function weightCell(symbol, value, grad) {
+        const negative = value < 0 ? " negative" : "";
+        return `
+          <div class="weight-cell${negative}">
+            <span>${symbol}</span>
+            <strong>${fmtSigned(value, 4)}</strong>
+            <small>∂L/∂ = ${fmtSigned(grad, 5)}</small>
+          </div>
+        `;
+      }
+
+      function biasCell(symbol, value, grad) {
+        return weightCell(symbol, value, grad);
+      }
+
+      function renderWeights() {
+        const snapshot = currentSnapshot();
+        const params = snapshot.params;
+        const grads = snapshot.grads;
+        $("w1Matrix").innerHTML = [
+          weightCell("w₁₀", params.W1[0][0], grads[0]),
+          weightCell("w₁₁", params.W1[0][1], grads[1]),
+          weightCell("w₂₀", params.W1[1][0], grads[2]),
+          weightCell("w₂₁", params.W1[1][1], grads[3])
+        ].join("");
+        $("biasH").innerHTML = [
+          biasCell("b₁⁽¹⁾", params.b1[0], grads[4]),
+          biasCell("b₁⁽²⁾", params.b1[1], grads[5])
+        ].join("");
+        $("w2Matrix").innerHTML = [
+          weightCell("w₂⁽¹⁾", params.w2[0], grads[6]),
+          weightCell("w₂⁽²⁾", params.w2[1], grads[7])
+        ].join("");
+        $("biasOut").innerHTML = biasCell("b₂", params.b2, grads[8]);
+      }
+
+      function renderAll() {
+        updateTimelineAndMetrics();
+        renderLearningPrompt();
+        renderSampleTabs();
+        renderNetwork();
+        drawBoundary();
+        drawLossChart();
+        renderForward();
+        renderWeights();
+        document.body.dataset.appReady = "true";
+      }
+
+      // ============================================================
+      // 6. 控件与悬停读数
+      // ============================================================
+      function stopPlayback() {
+        state.playing = false;
+      }
+
+      function setEpoch(epoch, shouldRender = true) {
+        state.epoch = clamp(Math.round(epoch), 0, TOTAL_EPOCHS);
+        if (shouldRender) scheduleRender();
+      }
+
+      function animationFrame(now) {
+        if (!state.playing) return;
+        const elapsed = now - state.animationStart;
+        const remainingRatio = (TOTAL_EPOCHS - state.animationFrom) / TOTAL_EPOCHS;
+        const duration = Math.max(900, state.animationDuration * remainingRatio);
+        const progress = clamp(elapsed / duration, 0, 1);
+        const nextEpoch = Math.round(state.animationFrom + (TOTAL_EPOCHS - state.animationFrom) * progress);
+
+        // 约 30 fps 更新面板，既能看到连续变化，也避免无意义地重复绘制。
+        if (nextEpoch !== state.epoch && now - state.lastAnimatedPaint > 28) {
+          state.epoch = nextEpoch;
+          state.lastAnimatedPaint = now;
+          renderAll();
+        }
+
+        if (progress >= 1) {
+          state.epoch = TOTAL_EPOCHS;
+          state.playing = false;
+          renderAll();
+          return;
+        }
+        requestAnimationFrame(animationFrame);
+      }
+
+      playBtn.addEventListener("click", () => {
+        if (state.playing) {
+          state.playing = false;
+          updateTimelineAndMetrics();
+          return;
+        }
+        if (state.epoch >= TOTAL_EPOCHS) state.epoch = 0;
+        state.playing = true;
+        state.animationFrom = state.epoch;
+        state.animationStart = performance.now();
+        state.lastAnimatedPaint = 0;
+        renderAll();
+        requestAnimationFrame(animationFrame);
+      });
+
+      $("resetBtn").addEventListener("click", () => {
+        stopPlayback();
+        setEpoch(0);
+      });
+
+      $("promptNextBtn").addEventListener("click", () => {
+        stopPlayback();
+        const milestones = [0, 50, 200, TOTAL_EPOCHS];
+        const next = milestones.find((epoch) => epoch > state.epoch) ?? 0;
+        setEpoch(next);
+      });
+
+      epochRange.addEventListener("input", () => {
+        stopPlayback();
+        setEpoch(Number(epochRange.value));
+      });
+
+      document.querySelectorAll("[data-epoch]").forEach((button) => {
+        button.addEventListener("click", () => {
+          stopPlayback();
+          setEpoch(Number(button.dataset.epoch));
+        });
+      });
+
+      ["showHeat", "showH1", "showH2"].forEach((id) => {
+        $(id).addEventListener("change", drawBoundary);
+      });
+      $("logScale").addEventListener("change", () => {
+        updateTimelineAndMetrics();
+        drawLossChart();
+      });
+
+      function canvasCoordinates(event) {
+        const rect = boundaryCanvas.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        const padding = {
+          left: width < 500 ? 39 : 51,
+          right: width < 500 ? 16 : 24,
+          top: 24,
+          bottom: width < 500 ? 38 : 43
+        };
+        const plotWidth = width - padding.left - padding.right;
+        const plotHeight = height - padding.top - padding.bottom;
+        const localX = event.clientX - rect.left;
+        const localY = event.clientY - rect.top;
+        if (localX < padding.left || localX > padding.left + plotWidth ||
+            localY < padding.top || localY > padding.top + plotHeight) return null;
+        const domainMin = -0.14;
+        const domainMax = 1.14;
+        return {
+          x1: domainMin + (localX - padding.left) / plotWidth * (domainMax - domainMin),
+          x2: domainMax - (localY - padding.top) / plotHeight * (domainMax - domainMin),
+          localX,
+          localY
+        };
+      }
+
+      boundaryCanvas.addEventListener("pointermove", (event) => {
+        const point = canvasCoordinates(event);
+        if (!point) {
+          if (state.hover) {
+            state.hover = null;
+            tooltip.style.display = "none";
+            drawBoundary();
+          }
+          return;
+        }
+        const prediction = forward(currentSnapshot().params, point.x1, point.x2);
+        state.hover = { x1: point.x1, x2: point.x2 };
+        tooltip.innerHTML = `
+          x₁ = ${fmt(point.x1, 3)} · x₂ = ${fmt(point.x2, 3)}<br>
+          h₁ = ${fmt(prediction.h1, 3)} · h₂ = ${fmt(prediction.h2, 3)}<br>
+          <b>P(y=1) = ${fmt(prediction.prob, 3)}</b>
+        `;
+        tooltip.style.display = "block";
+        const maxLeft = boundaryCanvas.clientWidth - 176;
+        const maxTop = boundaryCanvas.clientHeight - 72;
+        tooltip.style.left = `${clamp(point.localX + 13, 8, maxLeft)}px`;
+        tooltip.style.top = `${clamp(point.localY + 13, 8, maxTop)}px`;
+        drawBoundary();
+      });
+
+      boundaryCanvas.addEventListener("pointerleave", () => {
+        state.hover = null;
+        tooltip.style.display = "none";
+        drawBoundary();
+      });
+
+      // ResizeObserver 负责画布尺寸变化；重新渲染时保持当前 epoch。
+      if ("ResizeObserver" in window) {
+        const observer = new ResizeObserver(() => {
+          drawBoundary();
+          drawLossChart();
+        });
+        observer.observe(boundaryCanvas);
+        observer.observe(lossCanvas);
+      } else {
+        window.addEventListener("resize", () => {
+          drawBoundary();
+          drawLossChart();
+        });
+      }
+
+      window.addEventListener("error", (event) => {
+        console.error("XOR MLP visualizer error:", event.error || event.message);
+        document.body.dataset.appError = String(event.message || "unknown");
+      });
+
+      $("epochTotal").textContent = String(TOTAL_EPOCHS);
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
